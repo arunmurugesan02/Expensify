@@ -5,26 +5,59 @@ import {
   TouchableOpacity,
   Image,
   FlatList,
-  ScrollView,
 } from 'react-native';
-import React from 'react';
-import ScreenWrapper from '../components/ScreenWrapper';
+import React, {useEffect, useState} from 'react';
 import randomImage from '../assets/images/randomImage';
-const trip = [
-  {id: 1, place: 'Karur', country: 'TamilNadu'},
-  {id: 2, place: 'Erunakulam', country: 'Kerala'},
-  {id: 3, place: 'Bangalore', country: 'Karnataka'},
-  {id: 4, place: 'Hyderabad', country: 'Andhra Pradesh'},
-  {id: 5, place: 'Mumbai', country: 'Maharastra'},
-  {id: 6, place: 'Delhi', country: 'UP'},
-  {id: 7, place: 'Erunakulam', country: 'Kerala'},
-  {id: 8, place: 'Delhi', country: 'UP'},
-];
+import EmptyList from '../components/EmptyList';
+import {useIsFocused, useNavigation} from '@react-navigation/native';
+import {signOut} from 'firebase/auth';
+import {auth, tripsRef} from '../config/firebase';
+import {useSelector} from 'react-redux';
+import {getDocs, query, where} from 'firebase/firestore';
+import Loading from '../components/Loading';
+// const trip = [
+//   {id: 1, place: 'Karur', country: 'TamilNadu'},
+//   {id: 2, place: 'Erunakulam', country: 'Kerala'},
+//   {id: 3, place: 'Bangalore', country: 'Karnataka'},
+//   {id: 4, place: 'Hyderabad', country: 'Andhra Pradesh'},
+//   {id: 5, place: 'Mumbai', country: 'Maharastra'},
+//   {id: 6, place: 'Delhi', country: 'UP'},
+//   {id: 7, place: 'Erunakulam', country: 'Kerala'},
+//   {id: 8, place: 'Delhi', country: 'UP'},
+// ];
 
 export default function HomeScreen() {
+  const {user} = useSelector(state => state.user);
+  const [trips, setTrips] = useState([]);
+  const isFocused = useIsFocused();
+  const navigation = useNavigation();
+  const[loading,setLoading] = useState(false)
+
+  const fetchTrips = async () => {
+    setLoading(true);
+    const q =  query(tripsRef, where("userId",'==', user.uid));
+    const fetchedTrips = await getDocs(q);
+    let data = [];
+    fetchedTrips.forEach(doc => {
+      console.log(doc.data);
+      data.push({...doc.data(), id: doc.id});
+    });
+    console.log(trips);
+    console.log('coeeee');
+    setTrips(data);
+    setLoading(false);
+
+  };
+  useEffect(() => {
+    if (isFocused) {
+      fetchTrips();
+    }
+  }, [isFocused]);
+  const LogoutHandler = async () => {
+    await signOut(auth);
+  };
   return (
-    
-    <ScreenWrapper style={[styles.wrapper, (height = '100%')]}>
+    <View>
       <View style={styles.header}>
         <Text
           style={{
@@ -35,7 +68,7 @@ export default function HomeScreen() {
           }}>
           Expensify
         </Text>
-        <TouchableOpacity style={styles.btn}>
+        <TouchableOpacity style={styles.btn} onPress={LogoutHandler}>
           <Text
             style={{
               fontSize: 20,
@@ -79,7 +112,9 @@ export default function HomeScreen() {
             }}>
             Recent Trips
           </Text>
-          <TouchableOpacity style={styles.btn}>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={() => navigation.navigate('AddTrip')}>
             <Text
               style={{
                 fontSize: 20,
@@ -92,45 +127,58 @@ export default function HomeScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-        <View style={{height: 450, marginTop: 10}}>
-          <FlatList
-            style={{marginTop: 10, marginHorizontal: 10}}
-            data={trip}
-            numColumns={2}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-            columnWrapperStyle={{
-              justifyContent: 'center',
-            }}
-            renderItem={({item}) => {
-              return (
-                <TouchableOpacity style={styles.card}>
-                  <View>
-                    <Image
-                      source={randomImage()}
-                      style={{width: 130, height: 100, marginBottom: 10}}
-                    />
-                    <Text
-                      style={{color: 'black', fontWeight: 900, fontSize: 17}}>
-                      {item.place}
-                    </Text>
-                    <Text
-                      style={{
-                        color: 'black',
-                        fontWeight: 500,
-                        fontSize: 13,
-                        marginBottom: 5,
-                      }}>
-                      {item.country}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            }}
-          />
+        <View style={{height: 460, marginTop: 10}}>
+          {
+            loading ?(
+              <Loading />
+            ):(
+              <FlatList
+              style={{marginTop: 10, marginHorizontal: 10}}
+              data={trips}
+              numColumns={2}
+              ListEmptyComponent={
+                <EmptyList message={"You havent't recorded any trips yet"} />
+              }
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              columnWrapperStyle={{
+                justifyContent: 'center',
+              }}
+              renderItem={({item}) => {
+                console.log('Item in HomeScreen:', item);
+  
+                return (
+                  <TouchableOpacity
+                    style={styles.card}
+                    onPress={() => navigation.navigate('TripExpense', {...item})}>
+                    <View>
+                      <Image
+                        source={randomImage()}
+                        style={{width: 130, height: 100, marginBottom: 10}}
+                      />
+                      <Text
+                        style={{color: 'black', fontWeight: 900, fontSize: 17}}>
+                        {item.place}
+                      </Text>
+                      <Text
+                        style={{
+                          color: 'black',
+                          fontWeight: 500,
+                          fontSize: 13,
+                          marginBottom: 5,
+                        }}>
+                        {item.country}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+            )
+
+          }
+         
         </View>
-      </View>
-      <View>
         <Text>Hello</Text>
         <Text>Hello</Text>
         <Text>Hello</Text>
@@ -138,7 +186,8 @@ export default function HomeScreen() {
         <Text>Hello</Text>
         <Text>Hello</Text>
       </View>
-    </ScreenWrapper>
+      <View></View>
+    </View>
   );
 }
 
